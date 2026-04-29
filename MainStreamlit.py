@@ -660,8 +660,8 @@ unsafe_allow_html=True)
     with column1:  
         num_job = st.number_input('Enter the number of jobs to list', value=5, min_value = 1, max_value = 15)       #  Number of jobs to list in the html table
     with column1:
-        options = st.multiselect('Platform to find the job listings', ['Indeed','LinkedIn'], default=['Indeed'])   # Multiselect options for the job scrape
-    site_names = [option.lower() for option in options]                                                             # Formatting for job scrape
+        st.caption('Platform: LinkedIn')
+    site_names = ["linkedin"]
 
     def run_jobspy_scrape(scrape_kwargs):
         try:
@@ -685,9 +685,6 @@ unsafe_allow_html=True)
         if not ai_ready:
             st.error("Please add a Gemini API key in the sidebar to run Job Search Match.", icon="🚨")
             return
-        if not site_names:
-            st.error("Please select at least one platform before finding jobs.", icon="🚨")
-            return
         if not (job_desc or "").strip():
             st.error("Please enter a job title before finding jobs.", icon="🚨")
             return
@@ -702,27 +699,8 @@ unsafe_allow_html=True)
             try:
                 jobs = run_jobspy_scrape(scrape_kwargs)
             except Exception as e:
-                # Indeed frequently rate-limits or blocks cloud traffic; retry other selected sites.
-                has_indeed = "indeed" in site_names
-                fallback_sites = [site for site in site_names if site != "indeed"]
-
-                if has_indeed and fallback_sites:
-                    try:
-                        fallback_kwargs = {
-                            **scrape_kwargs,
-                            "site_name": fallback_sites,
-                        }
-                        jobs = run_jobspy_scrape(fallback_kwargs)
-                        st.warning(
-                            "Indeed scraping failed in this environment. Showing results from other selected platforms.",
-                            icon="⚠️",
-                        )
-                    except Exception as fallback_error:
-                        st.error(f"Job scraping failed: {fallback_error}", icon="🚨")
-                        return
-                else:
-                    st.error(f"Job scraping failed: {e}", icon="🚨")
-                    return
+                st.error(f"LinkedIn scraping failed: {e}", icon="🚨")
+                return
 
             if jobs is None or jobs.empty:
                 st.warning("No jobs found for that title and platform selection.", icon="⚠️")
