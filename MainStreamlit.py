@@ -13,6 +13,7 @@ import streamlit as st
 import json
 import time
 import numpy as np
+import re
 from google.api_core import exceptions as google_exceptions
 
 
@@ -348,11 +349,57 @@ def extract_text_from_pdf(pdf_file):
 
 
 def removeJSON(json_string):
+    if json_string is None:
+        return ""
+    if isinstance(json_string, str):
+        return json_string
 
     formatted_string = json.dumps(json_string)
     formatted_string = formatted_string.replace('{', '').replace('}', '').replace('"', '').replace(':', '').replace(',', '').replace('[', '').replace(']','')
 
     return formatted_string
+
+
+def parse_resume_summary_json(raw_text):
+    text = (raw_text or "").strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*```$", "", text)
+
+    candidates = [text]
+
+    first_obj = text.find("{")
+    last_obj = text.rfind("}")
+    if first_obj != -1 and last_obj != -1 and last_obj > first_obj:
+        candidates.append(text[first_obj:last_obj + 1])
+
+    first_arr = text.find("[")
+    last_arr = text.rfind("]")
+    if first_arr != -1 and last_arr != -1 and last_arr > first_arr:
+        candidates.append(text[first_arr:last_arr + 1])
+
+    parsed = None
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+            break
+        except json.JSONDecodeError:
+            continue
+
+    if parsed is None:
+        raise ValueError("Resume summary is not valid JSON")
+
+    if isinstance(parsed, dict):
+        return parsed
+
+    if isinstance(parsed, list):
+        merged = {}
+        for item in parsed:
+            if isinstance(item, dict):
+                merged.update(item)
+        if merged:
+            return merged
+
+    raise ValueError("Resume summary JSON has an unsupported structure")
 
 
 
@@ -532,10 +579,9 @@ unsafe_allow_html=True)
                 #st.write("Summarized:")
                 #st.write(summarized_result.text)
 
-                cleaned_data = summarized_result.text.replace("json", "").replace("`", "")
                 try:
-                    data = json.loads(cleaned_data)
-                except json.JSONDecodeError:
+                    data = parse_resume_summary_json(summarized_result.text)
+                except ValueError:
                     st.error("Gemini returned an unexpected format while summarizing the resume. Please try again.", icon="🚨")
                     return
 
