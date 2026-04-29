@@ -38,10 +38,8 @@ def configure_gemini_client(api_key):
 
 
 GEMINI_MODEL_CANDIDATES = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-1.0-pro",
-    "gemini-pro",
+    "gemini-3-flash-preview",
+ 
 ]
 
 
@@ -446,7 +444,7 @@ def main():
                         4. Generate a table by inputting your wanted job title for job recommendations 📑
                         <br>
                         **<h2>About</h2>**
-                        Welcome to Smart Decision Assistant, a tool powered by Gemini-1.0 Pro designed to compare job descriptions and job postings compatibility compared to your background.
+                        Welcome to Smart Decision Assistant, a tool powered by gemini-3-flash-preview designed to compare job descriptions and job postings compatibility compared to your background.
                         <br>
                         Job seekers are always in a hustle of searching for jobs and requires a lot of time and energy to surf job postings throughout different websites. Hence, the AI is designed to reduce the load on the jobseekers by listing the perfect job for them using AI.
                         
@@ -459,7 +457,7 @@ def main():
                         <br>
                         The job search works by scraping the information from the jobsites selected by the user. All the job description scraped is fed into the AI for comparison one by one.
                         **<h2>Is the AI 100% accurate in its job comparison?</h2>**
-                        The AI are not 100% accurate as it uses Gemini-1.0 Pro which uses Large Language Models (LLMs) to generate the output. The LLM itself are very powerful and accurate but are sometimes prone to hallucinations (Generating inaccurate or irrelevant content). The output should just be a reference or starting point for your career search. Use the application at the risk of some results might be innacurate.
+                        The AI are not 100% accurate as it uses gemini-3-flash-preview which uses Large Language Models (LLMs) to generate the output. The LLM itself are very powerful and accurate but are sometimes prone to hallucinations (Generating inaccurate or irrelevant content). The output should just be a reference or starting point for your career search. Use the application at the risk of some results might be innacurate.
                         <br>
                         **<h2>Why do i keep getting error?</h2>**
                         The errors might happen due to the AI not outputting the results in a certain format which is not compatible with the application. This happens due to the hallucinations that might happen. A solution to this is try re-running the application and re-inputting your background
