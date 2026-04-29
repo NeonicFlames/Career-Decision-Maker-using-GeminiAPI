@@ -665,23 +665,49 @@ unsafe_allow_html=True)
     with column1:  
         num_job = st.number_input('Enter the number of jobs to list', value=5, min_value = 1, max_value = 15)       #  Number of jobs to list in the html table
     with column1:
-        options = st.multiselect('Platform to find the job listings', ['Indeed','LinkedIn','Test'], default='Indeed')   # Multiselect options for the job scrape
+        options = st.multiselect('Platform to find the job listings', ['Indeed','LinkedIn'], default=['Indeed'])   # Multiselect options for the job scrape
     site_names = [option.lower() for option in options]                                                             # Formatting for job scrape
     if st.button('Find Jobs') and num_job > 0 and num_job < (num_job + 1):
         if not ai_ready:
             st.error("Please add a Gemini API key in the sidebar to run Job Search Match.", icon="🚨")
             return
+        if not site_names:
+            st.error("Please select at least one platform before finding jobs.", icon="🚨")
+            return
+        if not (job_desc or "").strip():
+            st.error("Please enter a job title before finding jobs.", icon="🚨")
+            return
         with st.spinner('Searching for jobs...'):
+            scrape_kwargs = {
+                "site_name": site_names,
+                "search_term": job_desc,
+                "location": "Malaysia",
+                "results_wanted": num_job,
+            }
 
+            try:
+                jobs = scrape_jobs(  # Job scraping
+                    **scrape_kwargs,
+                    hours_old=240,
+                    country_indeed='Malaysia'
+                )
+            except TypeError:
+                # Some python-jobspy versions do not support country_indeed.
+                try:
+                    jobs = scrape_jobs(
+                        **scrape_kwargs,
+                        hours_old=240,
+                    )
+                except TypeError:
+                    # Fallback for versions with minimal scrape_jobs signature.
+                    jobs = scrape_jobs(**scrape_kwargs)
+            except Exception as e:
+                st.error(f"Job scraping failed: {e}", icon="🚨")
+                return
 
-            jobs = scrape_jobs(     # Job scraping
-                site_name=site_names,
-                search_term=job_desc,
-                location="Malaysia",
-                results_wanted=num_job,
-                hours_old=240,  # Only LinkedIn is hour specific, others round up to days old
-                country_indeed='Malaysia'  # Only needed for indeed / glassdoor
-            )
+            if jobs is None or jobs.empty:
+                st.warning("No jobs found for that title and platform selection.", icon="⚠️")
+                return
             jobs.to_csv("jobss.csv", quoting=csv.QUOTE_NONNUMERIC, escapechar="\\", index=False)
             df = pd.read_csv("jobss.csv")
             try:
