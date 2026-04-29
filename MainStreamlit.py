@@ -456,12 +456,7 @@ def main():
             else:
                 st.warning("Please enter a valid Gemini API key.")
 
-        if st.button("Use Default API Key"):
-            st.session_state.gemini_api_key = get_default_gemini_key()
-            if configure_gemini_client(st.session_state.gemini_api_key):
-                st.success("Default Gemini API key activated.")
-            else:
-                st.warning("No default API key was found in Streamlit secrets.")
+        
 
     ai_ready = configure_gemini_client(st.session_state.gemini_api_key)
 
@@ -667,6 +662,25 @@ unsafe_allow_html=True)
     with column1:
         options = st.multiselect('Platform to find the job listings', ['Indeed','LinkedIn'], default=['Indeed'])   # Multiselect options for the job scrape
     site_names = [option.lower() for option in options]                                                             # Formatting for job scrape
+
+    def run_jobspy_scrape(scrape_kwargs):
+        try:
+            return scrape_jobs(
+                **scrape_kwargs,
+                hours_old=240,
+                country_indeed='Malaysia'
+            )
+        except TypeError:
+            # Some python-jobspy versions do not support country_indeed.
+            try:
+                return scrape_jobs(
+                    **scrape_kwargs,
+                    hours_old=240,
+                )
+            except TypeError:
+                # Fallback for versions with minimal scrape_jobs signature.
+                return scrape_jobs(**scrape_kwargs)
+
     if st.button('Find Jobs') and num_job > 0 and num_job < (num_job + 1):
         if not ai_ready:
             st.error("Please add a Gemini API key in the sidebar to run Job Search Match.", icon="🚨")
@@ -686,24 +700,29 @@ unsafe_allow_html=True)
             }
 
             try:
-                jobs = scrape_jobs(  # Job scraping
-                    **scrape_kwargs,
-                    hours_old=240,
-                    country_indeed='Malaysia'
-                )
-            except TypeError:
-                # Some python-jobspy versions do not support country_indeed.
-                try:
-                    jobs = scrape_jobs(
-                        **scrape_kwargs,
-                        hours_old=240,
-                    )
-                except TypeError:
-                    # Fallback for versions with minimal scrape_jobs signature.
-                    jobs = scrape_jobs(**scrape_kwargs)
+                jobs = run_jobspy_scrape(scrape_kwargs)
             except Exception as e:
-                st.error(f"Job scraping failed: {e}", icon="🚨")
-                return
+                # Indeed frequently rate-limits or blocks cloud traffic; retry other selected sites.
+                has_indeed = "indeed" in site_names
+                fallback_sites = [site for site in site_names if site != "indeed"]
+
+                if has_indeed and fallback_sites:
+                    try:
+                        fallback_kwargs = {
+                            **scrape_kwargs,
+                            "site_name": fallback_sites,
+                        }
+                        jobs = run_jobspy_scrape(fallback_kwargs)
+                        st.warning(
+                            "Indeed scraping failed in this environment. Showing results from other selected platforms.",
+                            icon="⚠️",
+                        )
+                    except Exception as fallback_error:
+                        st.error(f"Job scraping failed: {fallback_error}", icon="🚨")
+                        return
+                else:
+                    st.error(f"Job scraping failed: {e}", icon="🚨")
+                    return
 
             if jobs is None or jobs.empty:
                 st.warning("No jobs found for that title and platform selection.", icon="⚠️")
