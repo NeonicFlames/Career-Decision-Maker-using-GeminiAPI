@@ -13,6 +13,7 @@ import streamlit as st
 import json
 import time
 import numpy as np
+from google.api_core import exceptions as google_exceptions
 
 
 st.set_page_config(page_title="Smart Decision Assistant", page_icon="🧊", layout="wide")
@@ -34,6 +35,39 @@ def configure_gemini_client(api_key):
         return False
     genai.configure(api_key=clean_key)
     return True
+
+
+GEMINI_MODEL_CANDIDATES = [
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro",
+    "gemini-pro",
+]
+
+
+def call_gemini_with_fallback(contents, generation_config=None, safety_settings=None):
+    last_error = None
+
+    for model_name in GEMINI_MODEL_CANDIDATES:
+        try:
+            model = genai.GenerativeModel(
+                model_name,
+                generation_config=generation_config,
+                safety_settings=safety_settings,
+            )
+            return model.generate_content(contents)
+        except google_exceptions.NotFound as e:
+            # Try the next available model when one is unavailable.
+            last_error = e
+            continue
+        except Exception as e:
+            # Keep the last error so callers can surface a helpful message.
+            last_error = e
+            break
+
+    raise RuntimeError(
+        "Unable to generate content with Gemini. Check your API key and model access."
+    ) from last_error
 
 # %%
 def gemini_ai(education_saved, work_experience_saved, projects_saved, skills_saved, job_desc):
@@ -63,8 +97,6 @@ def gemini_ai(education_saved, work_experience_saved, projects_saved, skills_sav
             "threshold": "BLOCK_NONE"
         },
     ]
-    model = genai.GenerativeModel('gemini-pro')
-
     context = [
     {
         "role": "user",
@@ -149,7 +181,7 @@ Overall, your skills and experience are a good match for the job description, an
 
 
 
-    response = model.generate_content(context)
+    response = call_gemini_with_fallback(context, generation_config, safety_settings)
     return response
 
 
@@ -186,8 +218,6 @@ def gemini_ai_resume(extracted_resume):
         },
     ]
 
-    model = genai.GenerativeModel('gemini-pro')
-
     contextResume = [
     {
         "role": "user",
@@ -204,7 +234,7 @@ def gemini_ai_resume(extracted_resume):
     }
     
     ]
-    response = model.generate_content(contextResume)
+    response = call_gemini_with_fallback(contextResume, generation_config, safety_settings)
     return response
 
 def gemini_ai_job_matcher(education, work_experience, projects, skills, description):
@@ -233,8 +263,6 @@ def gemini_ai_job_matcher(education, work_experience, projects, skills, descript
             "threshold": "BLOCK_NONE"
         },
     ]
-    model = genai.GenerativeModel('gemini-pro')
-
     context = [
     {
         "role": "user",
@@ -307,7 +335,7 @@ To secure the job, here are some of the qualities to differentiate you from othe
     }
 ]
 
-    response = model.generate_content(context)
+    response = call_gemini_with_fallback(context, generation_config, safety_settings)
     return response.text
 
 
@@ -496,14 +524,22 @@ unsafe_allow_html=True)
                 text = extract_text_from_pdf(uploaded_file)
                 #st.text("Extracted Text:")
                 #st.write(text)
-                summarized_result = gemini_ai_resume(text)
+                try:
+                    summarized_result = gemini_ai_resume(text)
+                except Exception as e:
+                    st.error(f"Gemini request failed: {e}", icon="🚨")
+                    return
 
 
                 #st.write("Summarized:")
                 #st.write(summarized_result.text)
 
                 cleaned_data = summarized_result.text.replace("json", "").replace("`", "")
-                data = json.loads(cleaned_data)
+                try:
+                    data = json.loads(cleaned_data)
+                except json.JSONDecodeError:
+                    st.error("Gemini returned an unexpected format while summarizing the resume. Please try again.", icon="🚨")
+                    return
 
                 education_json = data.get("Education")
                 work_experience_json = data.get("Work Experience") or data.get("WorkExperience") or data.get("Work_Experience")
@@ -560,7 +596,11 @@ unsafe_allow_html=True)
             st.error("Please add a Gemini API key in the sidebar to generate AI opinion.", icon="🚨")
             return
         with st.spinner("Generating opinion"):
-            opinion_result = gemini_ai(st.session_state.education_saved, st.session_state.work_experience_saved, st.session_state.projects_saved, st.session_state.skills_saved, job_desc)
+            try:
+                opinion_result = gemini_ai(st.session_state.education_saved, st.session_state.work_experience_saved, st.session_state.projects_saved, st.session_state.skills_saved, job_desc)
+            except Exception as e:
+                st.error(f"Gemini request failed: {e}", icon="🚨")
+                return
             with st.container(border=True):
                 #st.write_stream(opinion_result.text)
                 st.write(opinion_result.text)
@@ -600,7 +640,11 @@ unsafe_allow_html=True)
             )
             jobs.to_csv("jobss.csv", quoting=csv.QUOTE_NONNUMERIC, escapechar="\\", index=False)
             df = pd.read_csv("jobss.csv")
-            df['match_rate'] = (df['title'] + ' ' + df['description']).apply(lambda x: gemini_ai_job_matcher(education, work_experience, projects, skills, x))
+            try:
+                df['match_rate'] = (df['title'] + ' ' + df['description']).apply(lambda x: gemini_ai_job_matcher(education, work_experience, projects, skills, x))
+            except Exception as e:
+                st.error(f"Gemini request failed while scoring jobs: {e}", icon="🚨")
+                return
             df = df[["title", "company", "match_rate", "job_url"]]
             df = df.sort_values(by='match_rate', ascending=False, na_position='last')
             df['Job Title'] = df.apply(lambda row: make_clickable(row['title'], row['job_url']), axis=1)

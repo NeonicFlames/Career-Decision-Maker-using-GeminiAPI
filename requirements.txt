@@ -1,7 +1,7 @@
 PyPDF2
 openpyxl
-google-generativeai
+google-generativeai>=0.7.2
+google-api-core>=2.19.0
 pandas
-google
 python-jobspy
 streamlit
