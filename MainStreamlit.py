@@ -21,9 +21,19 @@ st.set_page_config(page_title="Smart Decision Assistant", page_icon="🧊", layo
 gif_path = os.path.join(os.getcwd(), 'Images/Logo.gif')
 
 
-# Google API setup
-geminiapi = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=geminiapi)
+def get_default_gemini_key():
+    try:
+        return st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        return ""
+
+
+def configure_gemini_client(api_key):
+    clean_key = (api_key or "").strip()
+    if not clean_key:
+        return False
+    genai.configure(api_key=clean_key)
+    return True
 
 # %%
 def gemini_ai(education_saved, work_experience_saved, projects_saved, skills_saved, job_desc):
@@ -187,48 +197,7 @@ def gemini_ai_resume(extracted_resume):
         "role": "model",
         "parts": "Yes, I will give a very short summarizer where i will only OUTPUT 4 MAIN POINTS which are Education, Work Experience, Projects, and Skills using JSON FORMAT [{}] and will start with the json "
     },
-#     {
-#         "role": "user",
-#         "parts": """
-#         EDUCATION Abang Amirulluqman Farhan bin Abang Kilat
-# ❖ abangamirulluq99@gmail.com
-# ❖ 018-2649557
-# ❖ 1747, Taman Sabariah, Jalan Pengkalan Chepa, 15400, Kota Bharu, Kelantan
 
-# Universiti Tenaga Nasional (UNITEN) Oct. 2018 – Feb. 2023
-# Bachelor of Electrical and Electronics Engineering (Hons.)
-# ▪ CGPA: 3.61. First Class Honours
-# ▪ Courses: Microprocessor Systems, Artificial Intelligence , Digital Signal Processing, Data Communication and
-# Network, Radio Frequency & Microwave Engineering, Computer Organization and Architecture, VLSI Design
-# Kolej Matrikulasi Kelantan Jun. 2017 – Jun. 2018
-# Malaysian Matriculation (Science PST Module 1) ▪ CGPA: 3.78 WORK EXPERIENCE
-# Tenaga Nasional Berhad Jun. 2022 – Sep. 2022
-# Electrical Engineer Intern
-# ▪ Analyzed and simplified the single line diagram of power distribution in AutoCAD for Kelantan area , focusing on creating one - way line configurations , used by the technicians to easily identify flow of electricity
-# ▪ Enhanced my knowledge and skills through hands -on experience and close collaboration with technicians
-# during on-site visits, providing me with a deep understanding of TNB's power distribution system
-# PROJECTS
-# IoT-based Tracking System and Health Monitoring for the Elderly with Alzheimer
-# ▪ Developed an IoT wearable device prototype using C++ language in VSCode for ESP32 microcontroller programming, making use of libraries and resources for sensor integration and enhanced functionality
-# ▪ Integrated the ThingSpeak cloud platform to streamline data storage and analysis in CSV format, optimizing data analysis visualization and ease of use , while using the cloud platform for real -time abnormal data detection
-# ▪ Implemented an alert system that connects ThingSpeak cloud with the Telegram bot API, to notify the user and send the alert along with the data and location of the wearer triggered it to the user/caretaker through Telegram.
-# Smart Irrigation System using PIC18 Microcontroller
-# ▪ Designed a system incorporating multiple moisture sensors and pump areas to operate simultaneously by utilizing polled input for efficient irrigation management in Assembly language using MPLAB software
-# ▪ Implemented interrupt service routines and analog -to-digital converters I/O with appropriate voltage resolution for accurate moisture detection and to ensure smooth flow of the microcontroller’s program
-# Mitsubishi RV -M1 Robotic Arm based Mini -Production Line
-# ▪ Object rejection used servo motor, IR sensor and Arduino on the production line using ArduinoIDE software
-# ▪ Mitsubishi Robot Arm was programmed to pick up the accepted object and place it into the designated place
-# CERTIFICATIONS AND ACHIEVEMENTS
-# ▪ Enrolled in AI & Machine Learning Competence for Industry 4.0 Certification by SHRDC Exp. Mar. 2024
-# ▪ Volunteer for Community Service with 3ESC in collaboration with I -WELD Dec. 2022
-# ▪ English Trainer role for "Soar with Reading and Writing" Program Aug. 2017
-# SKILLS
-# Programming Language: C, C++, Python, Assembly , MySQL, MATLAB
-# Hardware: Oscilloscope, Signal Wave Generator, Arduino, ESP32, PIC18 Microcontroller
-# Design Programs: AutoCAD, Proteus, Simulink , LTSpice, Microwind, MPLAB, MikroC
-# Language Proficiency: Malay (Native), English (Fluent)
-#         """
-#     }, 
     {
         "role": "user",
         "parts": f"Here is my resume: {extracted_resume}"
@@ -395,6 +364,37 @@ def main():
 
     st.sidebar.image(gif_bytes)
 
+    if "gemini_api_key" not in st.session_state:
+        st.session_state.gemini_api_key = get_default_gemini_key()
+
+    with st.sidebar.expander("Gemini API Settings", expanded=False):
+        st.caption("Use your own Gemini API key. Stored only for this app session.")
+        sidebar_api_key = st.text_input(
+            "Gemini API Key",
+            value=st.session_state.gemini_api_key,
+            type="password",
+            placeholder="AIza..."
+        )
+
+        if st.button("Save API Key"):
+            st.session_state.gemini_api_key = sidebar_api_key.strip()
+            if configure_gemini_client(st.session_state.gemini_api_key):
+                st.success("Gemini API key saved and activated.")
+            else:
+                st.warning("Please enter a valid Gemini API key.")
+
+        if st.button("Use Default API Key"):
+            st.session_state.gemini_api_key = get_default_gemini_key()
+            if configure_gemini_client(st.session_state.gemini_api_key):
+                st.success("Default Gemini API key activated.")
+            else:
+                st.warning("No default API key was found in Streamlit secrets.")
+
+    ai_ready = configure_gemini_client(st.session_state.gemini_api_key)
+
+    if not ai_ready:
+        st.sidebar.warning("Add a Gemini API key to enable AI features.", icon="⚠️")
+
     st.sidebar.markdown("""
 
 
@@ -422,8 +422,7 @@ def main():
                         <br>
                         Job seekers are always in a hustle of searching for jobs and requires a lot of time and energy to surf job postings throughout different websites. Hence, the AI is designed to reduce the load on the jobseekers by listing the perfect job for them using AI.
                         
-                        Created by: [Abang Amirulluqman Farhan](https://www.linkedin.com/in/abang-amirulluqman-farhan-abang-kilat-073206226)
-                        ⭐ Star my work on GitHub: [![GitHub stars](https://img.shields.io/github/stars/FlameCerberus/Career-Decision-Maker-using-GeminiAPI.svg?style=social)](https://github.com/FlameCerberus/Career-Decision-Maker-using-GeminiAPI)
+                
 
                         **<h2>FAQs</h2>**
 
@@ -490,6 +489,10 @@ unsafe_allow_html=True)
         
         if st.session_state.resume == False:
             if uploaded_file is not None:
+                if not ai_ready:
+                    st.error("Please add a Gemini API key in the sidebar to use Resume Scanner.", icon="🚨")
+                    return
+
                 text = extract_text_from_pdf(uploaded_file)
                 #st.text("Extracted Text:")
                 #st.write(text)
@@ -553,6 +556,9 @@ unsafe_allow_html=True)
     
     # Processing user input
     if job_desc is not None and submit_button:
+        if not ai_ready:
+            st.error("Please add a Gemini API key in the sidebar to generate AI opinion.", icon="🚨")
+            return
         with st.spinner("Generating opinion"):
             opinion_result = gemini_ai(st.session_state.education_saved, st.session_state.work_experience_saved, st.session_state.projects_saved, st.session_state.skills_saved, job_desc)
             with st.container(border=True):
@@ -578,6 +584,9 @@ unsafe_allow_html=True)
         options = st.multiselect('Platform to find the job listings', ['Indeed','LinkedIn','Test'], default='Indeed')   # Multiselect options for the job scrape
     site_names = [option.lower() for option in options]                                                             # Formatting for job scrape
     if st.button('Find Jobs') and num_job > 0 and num_job < (num_job + 1):
+        if not ai_ready:
+            st.error("Please add a Gemini API key in the sidebar to run Job Search Match.", icon="🚨")
+            return
         with st.spinner('Searching for jobs...'):
 
 
