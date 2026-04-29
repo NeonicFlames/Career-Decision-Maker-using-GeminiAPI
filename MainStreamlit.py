@@ -39,7 +39,7 @@ def configure_gemini_client(api_key):
 
 
 GEMINI_MODEL_CANDIDATES = [
-    "gemini-1.5-flash-8b",
+    "gemini-2.0-flash-lite",
  
 ]
 
